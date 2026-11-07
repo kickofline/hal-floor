@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAL floor</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --line:#2a313a; --fg:#e6edf3; --muted:#8b949e;
+          --accent:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  header { padding:18px 20px 10px; display:flex; flex-wrap:wrap; gap:10px 18px; align-items:baseline; }
+  h1 { margin:0; font-size:19px; letter-spacing:.14em; }
+  .pill { border:1px solid var(--line); border-radius:999px; padding:2px 10px; color:var(--muted); }
+  .pill.full { color:var(--bad); border-color:#4b2226; }
+  main { padding:6px 20px 40px; max-width:1100px; }
+  .hint { color:var(--muted); margin:0 0 14px; }
+  .box { border:1px solid var(--line); border-radius:10px; background:var(--panel);
+         padding:12px 14px; margin-bottom:10px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
+  .host { font-size:15px; word-break:break-all; }
+  .badge { border-radius:999px; padding:1px 9px; font-size:12px; border:1px solid var(--line); color:var(--muted); }
+  .badge.agents { color:var(--accent); border-color:#1f3b5c; }
+  .badge.idle { color:var(--warn); border-color:#4a3a13; }
+  .badge.claimed { color:var(--ok); border-color:#1f4d2b; }
+  .meta { color:var(--muted); font-size:12.5px; }
+  .chg { color:var(--muted); font-size:12.5px; margin-top:6px; word-break:break-word; }
+  .actions { margin-left:auto; display:flex; gap:8px; }
+  button { background:#21262d; color:var(--fg); border:1px solid var(--line); border-radius:7px;
+           padding:6px 12px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.ghost { color:var(--muted); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .note { color:var(--ok); font-size:12.5px; margin-top:6px; }
+  .waiting { margin-top:22px; }
+  h2 { font-size:13px; letter-spacing:.12em; color:var(--muted); margin:0 0 8px; text-transform:uppercase; }
+  .waiting ol { margin:0; padding-left:22px; color:var(--muted); columns:2; column-gap:28px; }
+  .waiting li { break-inside:avoid; }
+  .empty { color:var(--muted); }
+  #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#21262d;
+           border:1px solid var(--line); border-radius:8px; padding:8px 14px; opacity:0;
+           transition:opacity .2s; pointer-events:none; max-width:90vw; }
+  #toast.show { opacity:1; }
+  #toast.bad { border-color:#5c2226; color:#ffb3ae; }
+  footer { color:var(--muted); padding:0 20px 30px; max-width:1100px; font-size:12.5px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>HAL FLOOR</h1>
+  <span id="slots" class="pill">–/–</span>
+  <span id="updated" class="pill">loading</span>
+  <span class="pill">no login · claims are advisory</span>
+</header>
+<main>
+  <p class="hint">Claim a box before you touch it so the agents and the rest of the team stay off it.
+     Claims expire on their own; clear yours when you are done.</p>
+  <div id="boxes"><p class="empty">Loading…</p></div>
+  <section class="waiting">
+    <h2>Waiting on a slot <span id="waitCount" class="meta"></span></h2>
+    <ol id="waiting"></ol>
+  </section>
+</main>
+<footer>Claims are shown to <code>python tooling/hal.py floor</code>; they do not stop a VM and are not a lock.</footer>
+<div id="toast"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+let busy = false;
+
+function toast(msg, bad) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'show' + (bad ? ' bad' : '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { t.className = ''; }, 4200);
+}
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function clock(iso) {
+  if (!iso) return '–';
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function left(iso) {
+  if (!iso) return '';
+  const ms = new Date(iso).getTime() - Date.now();
+  if (!(ms > 0)) return 'expired';
+  const m = Math.round(ms / 60000);
+  return m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}m` : `${m}m`;
+}
+
+async function post(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+  return data;
+}
+
+function claimBox(box) {
+  const who = prompt(`Who is claiming ${box.host}?\n\nName (seat2, alice, …)`);
+  if (!who) return;
+  const note = prompt('What are you doing on it? (optional)') || '';
+  const mins = parseInt(prompt('Hold for how many minutes? (10–180)', '45'), 10) || 45;
+  return post('/api/claim', { host: box.host, owner: who, note, minutes: mins })
+    .then(() => { toast('Claimed ' + box.host); load(true); })
+    .catch((e) => toast(e.message, true));
+}
+
+function clearBox(box) {
+  if (!confirm(`Clear the claim on ${box.host}?`)) return;
+  return post('/api/claims/clear', { host: box.host })
+    .then(() => { toast('Claim cleared'); load(true); })
+    .catch((e) => toast(e.message, true));
+}
+
+function render(data) {
+  const slots = data.slots || {};
+  const cap = slots.cap, count = slots.count;
+  $('slots').textContent = `${count ?? 0}/${cap ?? '?'} boxes`;
+  $('slots').className = 'pill' + (cap && count >= cap ? ' full' : '');
+  $('updated').textContent = data.updated ? 'seen ' + new Date(data.updated * 1000).toLocaleTimeString() : 'no data yet';
+  const boxes = data.boxes || [];
+  const wrap = $('boxes');
+  wrap.textContent = '';
+  if (!boxes.length) wrap.append(el('p', 'empty', 'The workbench has not published any box yet.'));
+  for (const b of boxes) {
+    const card = el('div', 'box');
+    const row = el('div', 'row');
+    row.append(el('span', 'host', b.host));
+    const owner = b.claim ? 'claimed' : (b.owner === 'agents' ? 'agents' : b.owner === 'agents-idle' ? 'idle' : 'team');
+    const label = b.claim ? (b.claim.owner || 'claimed') : (b.owner === 'agents' ? 'agents working'
+                    : b.owner === 'agents-idle' ? 'ours, idle' : 'team');
+    row.append(el('span', 'badge ' + owner, label));
+    row.append(el('span', 'meta', b.stopsAt ? `frees ${clock(b.stopsAt)} (${left(b.stopsAt)})` : 'no expiry'));
+    if (b.agents) row.append(el('span', 'meta', `${b.agents} agent panel${b.agents > 1 ? 's' : ''}`));
+    const actions = el('div', 'actions');
+    if (b.claim) {
+      const clear = el('button', 'ghost', 'Clear claim');
+      clear.onclick = () => clearBox(b);
+      actions.append(clear);
+    }
+    const claim = el('button', null, b.claim ? 'Re-claim' : 'Claim');
+    claim.onclick = () => claimBox(b);
+    actions.append(claim);
+    row.append(actions);
+    card.append(row);
+    if (b.claim && (b.claim.note || b.claim.expires)) {
+      card.append(el('div', 'note', [b.claim.note, b.claim.expires ? `held ${left(new Date(b.claim.expires * 1000).toISOString())} more` : '']
+        .filter(Boolean).join(' · ')));
+    }
+    const names = b.challenges || [];
+    card.append(el('div', 'chg', names.length ? names.join(', ') : 'no challenges mapped to this host'));
+    wrap.append(card);
+  }
+  const waiting = data.waiting || [];
+  $('waitCount').textContent = waiting.length ? `(${waiting.length})` : '';
+  const list = $('waiting');
+  list.textContent = '';
+  for (const w of waiting) list.append(el('li', null, typeof w === 'string' ? w : (w.challenge || '')));
+  if (!waiting.length) list.append(el('li', 'empty', 'nothing queued'));
+}
+
+async function load(force) {
+  if (busy) return;
+  busy = true;
+  try {
+    const r = await fetch('/api/floor', { cache: 'no-store' });
+    render(await r.json());
+  } catch (e) {
+    $('updated').textContent = 'offline';
+  } finally {
+    busy = false;
+  }
+}
+
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>
