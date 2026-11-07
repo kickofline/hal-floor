@@ -17,9 +17,11 @@ from urllib.parse import urlsplit
 DATA = Path(os.environ.get('FLOOR_DATA', '/data'))
 STATE = DATA / 'state.json'
 CLAIMS = DATA / 'claims.json'
+REQUESTS = DATA / 'requests.json'
 PORT = int(os.environ.get('PORT', '8000'))
 KEY = os.environ.get('HAL_FLOOR_KEY', '')
 CLAIM_MIN, CLAIM_MAX, CLAIM_DEFAULT = 10, 180, 45
+STOP_TTL = 300
 WRITE_WINDOW, WRITE_LIMIT = 300.0, 20.0
 LOCK = threading.Lock()
 HITS: dict[str, list[float]] = {}
@@ -46,6 +48,12 @@ def claims() -> dict:
     return data
 
 
+def stop_requests() -> list:
+    now = time.time()
+    rows = [r for r in (load(REQUESTS, []) or []) if isinstance(r, dict) and float(r.get('expires') or 0) > now]
+    return rows
+
+
 def state() -> dict:
     raw = load(STATE, {}) or {}
     cl = claims()
@@ -55,8 +63,9 @@ def state() -> dict:
         item['claim'] = cl.get(box.get('host', ''))
         boxes.append(item)
     waiting = raw.get('waiting', [])
+    stopping = [r.get('host') for r in stop_requests()]
     return {'boxes': boxes, 'waiting': waiting, 'slots': raw.get('slots') or {},
-            'updated': raw.get('updated'), 'claims': list(cl.values())}
+            'updated': raw.get('updated'), 'claims': list(cl.values()), 'stopping': stopping}
 
 
 def limited(ip: str) -> bool:
@@ -123,6 +132,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(state())
         elif path == '/api/claims':
             self._json({'claims': claims(), 'now': time.time()})
+        elif path == '/api/requests':
+            self._json({'requests': stop_requests(), 'now': time.time()})
         else:
             self._json({'error': 'not found'}, HTTPStatus.NOT_FOUND)
 
@@ -143,6 +154,40 @@ class Handler(http.server.BaseHTTPRequestHandler):
             save(STATE, {'boxes': boxes, 'waiting': body.get('waiting') or [],
                          'slots': body.get('slots') or {}, 'updated': time.time()})
             self._json({'ok': True, 'boxes': len(boxes)})
+            return
+        if path == '/api/requests/ack':
+            body = self._body()
+            ids = body.get('ids')
+            if not isinstance(ids, list):
+                self._json({'error': 'bad ids'}, HTTPStatus.BAD_REQUEST)
+                return
+            want = {str(i) for i in ids[:50]}
+            rows = [r for r in stop_requests() if r.get('id') not in want]
+            save(REQUESTS, rows)
+            self._json({'ok': True, 'left': len(rows)})
+            return
+        if path == '/api/stop':
+            if limited(ip):
+                self._json({'error': 'too many writes, wait a few minutes'}, HTTPStatus.TOO_MANY_REQUESTS)
+                return
+            body = self._body()
+            host = clean(body.get('host'), 120).lower()
+            owner = clean(body.get('owner'), 32)
+            known = {b.get('host') for b in (load(STATE, {}) or {}).get('boxes', [])}
+            if not host or (known and host not in known):
+                self._json({'error': 'unknown box'}, HTTPStatus.BAD_REQUEST)
+                return
+            claim = claims().get(host)
+            if not claim or str(claim.get('owner', '')).lower() != owner.lower():
+                self._json({'error': 'claim the box first (with the same name), then stop it'}, HTTPStatus.FORBIDDEN)
+                return
+            now = time.time()
+            rows = [r for r in stop_requests() if r.get('host') != host]
+            row = {'id': secrets.token_hex(4), 'host': host, 'owner': claim['owner'], 'at': now,
+                   'expires': now + STOP_TTL}
+            rows.append(row)
+            save(REQUESTS, rows)
+            self._json({'ok': True, 'request': row})
             return
         if path in ('/api/claim', '/api/claims/clear'):
             if limited(ip):

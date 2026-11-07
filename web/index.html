@@ -31,6 +31,9 @@
            padding:6px 12px; font:inherit; cursor:pointer; }
   button:hover { border-color:var(--accent); }
   button.ghost { color:var(--muted); }
+  button.danger { color:#ffb3ae; border-color:#5c2226; }
+  button.danger:hover { border-color:var(--bad); }
+  .badge.stopping { color:#f85149; border-color:#5c2226; }
   button:disabled { opacity:.45; cursor:not-allowed; }
   .note { color:var(--ok); font-size:12.5px; margin-top:6px; }
   .waiting { margin-top:22px; }
@@ -115,6 +118,13 @@ function claimBox(box) {
     .catch((e) => toast(e.message, true));
 }
 
+function stopBox(box) {
+  if (!confirm(`Stop ${box.host}?\n\nThe workbench frees the slot on its next tick.`)) return;
+  return post('/api/stop', { host: box.host, owner: box.claim.owner })
+    .then(() => { toast('Stop requested for ' + box.host); load(true); })
+    .catch((e) => toast(e.message, true));
+}
+
 function clearBox(box) {
   if (!confirm(`Clear the claim on ${box.host}?`)) return;
   return post('/api/claims/clear', { host: box.host })
@@ -129,6 +139,7 @@ function render(data) {
   $('slots').className = 'pill' + (cap && count >= cap ? ' full' : '');
   $('updated').textContent = data.updated ? 'seen ' + new Date(data.updated * 1000).toLocaleTimeString() : 'no data yet';
   const boxes = data.boxes || [];
+  const stoppingHosts = data.stopping || [];
   const wrap = $('boxes');
   wrap.textContent = '';
   if (!boxes.length) wrap.append(el('p', 'empty', 'The workbench has not published any box yet.'));
@@ -142,6 +153,8 @@ function render(data) {
     row.append(el('span', 'badge ' + owner, label));
     row.append(el('span', 'meta', b.stopsAt ? `frees ${clock(b.stopsAt)} (${left(b.stopsAt)})` : 'no expiry'));
     if (b.agents) row.append(el('span', 'meta', `${b.agents} agent panel${b.agents > 1 ? 's' : ''}`));
+    const stopping = stoppingHosts.includes(b.host);
+    if (stopping) row.append(el('span', 'badge stopping', 'stop requested'));
     const actions = el('div', 'actions');
     if (b.claim) {
       const clear = el('button', 'ghost', 'Clear claim');
@@ -151,6 +164,15 @@ function render(data) {
     const claim = el('button', null, b.claim ? 'Re-claim' : 'Claim');
     claim.onclick = () => claimBox(b);
     actions.append(claim);
+    const stop = el('button', 'danger', 'Stop');
+    if (b.claim) {
+      stop.onclick = () => stopBox(b);
+      stop.title = 'The workbench stops this VM on its next tick';
+    } else {
+      stop.disabled = true;
+      stop.title = 'Claim the box first, then stop it';
+    }
+    actions.append(stop);
     row.append(actions);
     card.append(row);
     if (b.claim && (b.claim.note || b.claim.expires)) {
