@@ -1,0 +1,25 @@
+{
+ "boxes": [
+  {
+   "host": "eclss-26.razorhack.internal",
+   "owner": "agents",
+   "challenges": [
+    "a",
+    "b"
+   ],
+   "agents": 2,
+   "stopsAt": "2026-11-07T21:06:12Z"
+  }
+ ],
+ "waiting": [
+  {
+   "challenge": "w1",
+   "solves": 4
+  }
+ ],
+ "slots": {
+  "count": 1,
+  "cap": 4
+ },
+ "updated": 1794083961.594397
+}
