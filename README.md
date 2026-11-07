@@ -9,6 +9,10 @@ agents off a claimed box.
 - `POST /api/state` — workbench snapshot, requires `X-Floor-Key: $HAL_FLOOR_KEY`
 - `POST /api/claim` `{host, owner, note, minutes}` — no auth, rate limited per IP
 - `POST /api/claims/clear` `{host}`
+- `POST /api/stop` `{host, owner}` — ask the workbench to stop a box; the name must match the box's
+  current claim. The workbench refuses while an agent supervisor/worker is on any challenge the box
+  serves, and otherwise stops it on its next tick (~30 s).
+- `GET /api/requests`, `POST /api/requests/ack` `{ids}` — the workbench's queue and acknowledgement
 - `GET /api/claims` — claims for the workbench to poll
 - `GET /healthz`
 
