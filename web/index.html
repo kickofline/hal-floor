@@ -3,73 +3,154 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HAL floor</title>
+<meta name="color-scheme" content="dark">
+<title>HAL floor · team board</title>
 <style>
-  :root { --bg:#0d1117; --panel:#161b22; --line:#2a313a; --fg:#e6edf3; --muted:#8b949e;
-          --accent:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg);
-         font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
-  header { padding:18px 20px 10px; display:flex; flex-wrap:wrap; gap:10px 18px; align-items:baseline; }
-  h1 { margin:0; font-size:19px; letter-spacing:.14em; }
-  .pill { border:1px solid var(--line); border-radius:999px; padding:2px 10px; color:var(--muted); }
-  .pill.full { color:var(--bad); border-color:#4b2226; }
-  main { padding:6px 20px 40px; max-width:1100px; }
-  .hint { color:var(--muted); margin:0 0 14px; }
-  .box { border:1px solid var(--line); border-radius:10px; background:var(--panel);
-         padding:12px 14px; margin-bottom:10px; }
-  .row { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
-  .host { font-size:15px; word-break:break-all; }
-  .badge { border-radius:999px; padding:1px 9px; font-size:12px; border:1px solid var(--line); color:var(--muted); }
-  .badge.agents { color:var(--accent); border-color:#1f3b5c; }
-  .badge.idle { color:var(--warn); border-color:#4a3a13; }
-  .badge.claimed { color:var(--ok); border-color:#1f4d2b; }
-  .meta { color:var(--muted); font-size:12.5px; }
-  .chg { color:var(--muted); font-size:12.5px; margin-top:6px; word-break:break-word; }
-  .actions { margin-left:auto; display:flex; gap:8px; }
-  button { background:#21262d; color:var(--fg); border:1px solid var(--line); border-radius:7px;
-           padding:6px 12px; font:inherit; cursor:pointer; }
-  button:hover { border-color:var(--accent); }
-  button.ghost { color:var(--muted); }
-  button.danger { color:#ffb3ae; border-color:#5c2226; }
-  button.danger:hover { border-color:var(--bad); }
-  .badge.stopping { color:#f85149; border-color:#5c2226; }
-  button:disabled { opacity:.45; cursor:not-allowed; }
-  .note { color:var(--ok); font-size:12.5px; margin-top:6px; }
-  .waiting { margin-top:22px; }
-  h2 { font-size:13px; letter-spacing:.12em; color:var(--muted); margin:0 0 8px; text-transform:uppercase; }
-  .waiting ol { margin:0; padding-left:22px; color:var(--muted); columns:2; column-gap:28px; }
-  .waiting li { break-inside:avoid; }
-  .empty { color:var(--muted); }
-  #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#21262d;
-           border:1px solid var(--line); border-radius:8px; padding:8px 14px; opacity:0;
-           transition:opacity .2s; pointer-events:none; max-width:90vw; }
-  #toast.show { opacity:1; }
-  #toast.bad { border-color:#5c2226; color:#ffb3ae; }
-  footer { color:var(--muted); padding:0 20px 30px; max-width:1100px; font-size:12.5px; }
+  :root {
+    --bg: #0a0c10; --panel: #12161d; --raised: #171c25; --line: #232a36; --line-soft: #1b212b;
+    --fg: #e7eaf1; --muted: #8b93a4; --faint: #6b7385;
+    --accent: #7aa2ff; --accent-bg: rgba(122,162,255,.12);
+    --ok: #3fb68b; --warn: #e0a43a; --bad: #e5534b;
+    --mono: "Cascadia Code", Consolas, ui-monospace, monospace;
+    --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--sans); }
+  a { color: var(--accent); text-decoration: none; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 22px 48px; }
+  header.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px; margin-bottom: 6px; }
+  .brand { font-size: 15px; font-weight: 700; letter-spacing: .18em; }
+  .brand span { color: var(--faint); font-weight: 500; letter-spacing: .06em; }
+  .pill { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+  .pill.full { color: var(--bad); border-color: rgba(229,83,75,.35); background: rgba(229,83,75,.08); }
+  .pill.live { color: var(--ok); border-color: rgba(63,182,139,.3); }
+  .sub { color: var(--muted); font-size: 13px; max-width: 70ch; margin: 0 0 18px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 18px; align-items: start; }
+  @media (max-width: 940px) { .grid { grid-template-columns: 1fr; } }
+  .stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .card-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); }
+  .card-head h2 { margin: 0; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .card-head .grow { flex: 1; }
+  .card-body { padding: 14px 16px; }
+  .box { border: 1px solid var(--line-soft); border-radius: 12px; background: var(--raised); padding: 12px 14px; }
+  .box + .box { margin-top: 10px; }
+  .box-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .host { font-family: var(--mono); font-size: 13.5px; font-weight: 600; word-break: break-all; }
+  .badge { border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .badge.agents { color: var(--accent); border-color: rgba(122,162,255,.3); background: var(--accent-bg); }
+  .badge.idle { color: var(--warn); border-color: rgba(224,164,58,.3); background: rgba(224,164,58,.09); }
+  .badge.claimed { color: var(--ok); border-color: rgba(63,182,139,.3); background: rgba(63,182,139,.09); }
+  .badge.stopping { color: #ff9b95; border-color: rgba(229,83,75,.35); }
+  .meta { color: var(--muted); font-size: 12.5px; }
+  .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  button { font: inherit; color: var(--fg); background: #1d2430; border: 1px solid var(--line); border-radius: 9px; padding: 6px 12px; cursor: pointer; transition: border-color .15s, background .15s; }
+  button:hover { border-color: var(--accent); }
+  button.ghost { background: transparent; color: var(--muted); }
+  button.danger { color: #ffb3ae; border-color: rgba(229,83,75,.3); background: transparent; }
+  button.danger:hover { border-color: var(--bad); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .chip { font-family: var(--mono); font-size: 11.5px; color: var(--muted); background: #0e1218; border: 1px solid var(--line-soft); border-radius: 7px; padding: 2px 7px; }
+  .claim-note { margin-top: 8px; color: var(--ok); font-size: 12.5px; }
+  .rival-team { font-size: 20px; font-weight: 650; line-height: 1.25; }
+  .rival-lead { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .rival-lead b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .bars { margin: 14px 0 4px; display: grid; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: 46px 1fr 76px; gap: 10px; align-items: center; font-size: 12.5px; }
+  .bar-label { color: var(--muted); }
+  .bar-track { height: 8px; border-radius: 999px; background: #0d1117; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4c7dff, #7aa2ff); }
+  .bar-fill.them { background: linear-gradient(90deg, #b4552f, #e0793a); }
+  .bar-val { text-align: right; font-variant-numeric: tabular-nums; color: var(--fg); }
+  .split { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+  .stat { background: #0e1218; border: 1px solid var(--line-soft); border-radius: 10px; padding: 9px 10px; }
+  .stat .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+  .stat .v { font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .scan { margin-top: 12px; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .scan .track { flex: 1; min-width: 90px; height: 4px; border-radius: 999px; background: #0d1117; overflow: hidden; }
+  .scan .fill { height: 100%; background: var(--accent); }
+  .top-list { margin-top: 14px; display: grid; gap: 2px; }
+  .top-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: baseline; padding: 5px 8px; border-radius: 8px; font-size: 12.5px; }
+  .top-row.us { background: rgba(122,162,255,.10); }
+  .top-row.rival { background: rgba(224,121,58,.10); }
+  .top-row .pos { color: var(--faint); font-variant-numeric: tabular-nums; }
+  .top-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top-row .score { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .wait-item { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; font-size: 13px; }
+  .wait-item .pts { color: var(--faint); font-family: var(--mono); font-size: 11.5px; }
+  .empty { color: var(--muted); font-size: 13px; margin: 2px 0; }
+  dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--fg); padding: 0; width: min(420px, 92vw); }
+  dialog::backdrop { background: rgba(3, 5, 8, .65); }
+  .dlg-head { padding: 14px 16px 0; font-weight: 650; }
+  .dlg-body { padding: 12px 16px; display: grid; gap: 10px; }
+  .dlg-foot { padding: 0 16px 16px; display: flex; gap: 8px; justify-content: flex-end; }
+  label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  input, textarea { font: inherit; color: var(--fg); background: #0d1117; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  footer { color: var(--faint); font-size: 12px; margin-top: 22px; }
+  footer code { color: var(--muted); }
+  #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; opacity: 0; transition: opacity .18s; pointer-events: none; max-width: 90vw; font-size: 13px; }
+  #toast.show { opacity: 1; }
+  #toast.bad { border-color: rgba(229,83,75,.45); color: #ffb3ae; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+  .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); } .dot.mute { background: var(--faint); }
 </style>
 </head>
 <body>
-<header>
-  <h1>HAL FLOOR</h1>
-  <span id="slots" class="pill">–/–</span>
+<div class="wrap">
+<header class="top">
+  <div class="brand">HAL <span>FLOOR</span></div>
+  <span id="slots" class="pill">–/– boxes</span>
   <span id="updated" class="pill">loading</span>
-  <span class="pill">no login · claims are advisory</span>
+  <span class="pill live">no login · claims are advisory</span>
 </header>
-<main>
-  <p class="hint">Claim a box before you touch it so the agents and the rest of the team stay off it.
-     Claims expire on their own; clear yours when you are done.</p>
-  <div id="boxes"><p class="empty">Loading…</p></div>
-  <section class="waiting">
-    <h2>Waiting on a slot <span id="waitCount" class="meta"></span></h2>
-    <ol id="waiting"></ol>
-  </section>
-</main>
-<footer>Claims are shown to <code>python tooling/hal.py floor</code>; they do not stop a VM and are not a lock.</footer>
-<div id="toast"></div>
+<p class="sub">Claim a box before you touch it so the agents and the rest of the team stay off it. Claims expire on their own; clear yours when you are done. The rival panel is published by the workbench and only ever shows counts.</p>
+
+<div class="grid">
+  <div class="stack">
+    <section class="card" aria-labelledby="boxes-h">
+      <div class="card-head"><h2 id="boxes-h">Boxes</h2><span class="grow"></span><span id="boxCount" class="meta"></span></div>
+      <div class="card-body" id="boxes"><p class="empty">Loading…</p></div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card" aria-labelledby="rival-h">
+      <div class="card-head"><h2 id="rival-h">Rivals</h2><span class="grow"></span><span id="rivalSeen" class="meta"></span></div>
+      <div class="card-body" id="rival"><p class="empty">The workbench has not published a rival yet.</p></div>
+    </section>
+
+    <section class="card" aria-labelledby="wait-h">
+      <div class="card-head"><h2 id="wait-h">Waiting on a slot</h2><span class="grow"></span><span id="waitCount" class="meta"></span></div>
+      <div class="card-body"><div id="waiting" class="list"></div></div>
+    </section>
+  </div>
+</div>
+
+<footer>Claims are advisory: they never stop a VM. <code>python tooling/hal.py floor</code> prints the same board on the seat.</footer>
+</div>
+
+<dialog id="claimDlg">
+  <form method="dialog" id="claimForm">
+    <div class="dlg-head">Claim <span id="claimHost" class="host"></span></div>
+    <div class="dlg-body">
+      <label>Name <input id="claimWho" maxlength="32" placeholder="seat2, alice, …" autocomplete="off" required></label>
+      <label>What for? <input id="claimNote" maxlength="80" placeholder="modbus walkthrough (optional)" autocomplete="off"></label>
+      <label>Hold for <input id="claimMins" type="number" min="10" max="180" step="5" value="45"></label>
+    </div>
+    <div class="dlg-foot">
+      <button value="cancel" class="ghost" formnovalidate>Cancel</button>
+      <button value="ok" id="claimOk">Claim</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
 <script>
 const $ = (id) => document.getElementById(id);
-let busy = false;
+let busy = false, current = null, tick = null;
 
 function toast(msg, bad) {
   const t = $('toast');
@@ -88,8 +169,7 @@ function el(tag, cls, text) {
 
 function clock(iso) {
   if (!iso) return '–';
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function left(iso) {
@@ -97,102 +177,196 @@ function left(iso) {
   const ms = new Date(iso).getTime() - Date.now();
   if (!(ms > 0)) return 'expired';
   const m = Math.round(ms / 60000);
-  return m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}m` : `${m}m`;
+  return m >= 60 ? Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0') + 'm' : m + 'm';
 }
 
 async function post(path, body) {
-  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(body) });
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
   return data;
 }
 
-function claimBox(box) {
-  const who = prompt(`Who is claiming ${box.host}?\n\nName (seat2, alice, …)`);
-  if (!who) return;
-  const note = prompt('What are you doing on it? (optional)') || '';
-  const mins = parseInt(prompt('Hold for how many minutes? (10–180)', '45'), 10) || 45;
-  return post('/api/claim', { host: box.host, owner: who, note, minutes: mins })
-    .then(() => { toast('Claimed ' + box.host); load(true); })
-    .catch((e) => toast(e.message, true));
+function openClaim(box) {
+  $('claimHost').textContent = box.host;
+  $('claimWho').value = box.claim ? box.claim.owner : '';
+  $('claimNote').value = '';
+  $('claimMins').value = box.claim ? 45 : 45;
+  $('claimDlg').returnValue = '';
+  $('claimDlg').showModal();
+  $('claimWho').focus();
+  $('claimDlg').onclose = () => {
+    if ($('claimDlg').returnValue !== 'ok') return;
+    const owner = $('claimWho').value.trim();
+    if (!owner) return;
+    post('/api/claim', { host: box.host, owner, note: $('claimNote').value.trim(),
+                         minutes: parseInt($('claimMins').value, 10) || 45 })
+      .then(() => { toast('Claimed ' + box.host); load(false); })
+      .catch((e) => toast(e.message, true));
+  };
 }
 
 function stopBox(box) {
-  if (!confirm(`Stop ${box.host}?\n\nThe workbench frees the slot on its next tick.`)) return;
-  return post('/api/stop', { host: box.host, owner: box.claim.owner })
-    .then(() => { toast('Stop requested for ' + box.host); load(true); })
+  if (!confirm('Stop ' + box.host + '?\n\nThe workbench frees the slot on its next tick.')) return;
+  post('/api/stop', { host: box.host, owner: box.claim.owner })
+    .then(() => { toast('Stop requested for ' + box.host); load(false); })
     .catch((e) => toast(e.message, true));
 }
 
 function clearBox(box) {
-  if (!confirm(`Clear the claim on ${box.host}?`)) return;
-  return post('/api/claims/clear', { host: box.host })
-    .then(() => { toast('Claim cleared'); load(true); })
+  if (!confirm('Clear the claim on ' + box.host + '?')) return;
+  post('/api/claims/clear', { host: box.host })
+    .then(() => { toast('Claim cleared'); load(false); })
     .catch((e) => toast(e.message, true));
 }
 
-function render(data) {
-  const slots = data.slots || {};
-  const cap = slots.cap, count = slots.count;
-  $('slots').textContent = `${count ?? 0}/${cap ?? '?'} boxes`;
-  $('slots').className = 'pill' + (cap && count >= cap ? ' full' : '');
-  $('updated').textContent = data.updated ? 'seen ' + new Date(data.updated * 1000).toLocaleTimeString() : 'no data yet';
+function renderBoxes(data) {
   const boxes = data.boxes || [];
-  const stoppingHosts = data.stopping || [];
+  const stopping = data.stopping || [];
   const wrap = $('boxes');
   wrap.textContent = '';
-  if (!boxes.length) wrap.append(el('p', 'empty', 'The workbench has not published any box yet.'));
+  $('boxCount').textContent = boxes.length ? boxes.length + ' live' : '';
+  if (!boxes.length) { wrap.append(el('p', 'empty', 'The workbench has not published a box yet.')); return; }
   for (const b of boxes) {
     const card = el('div', 'box');
-    const row = el('div', 'row');
-    row.append(el('span', 'host', b.host));
-    const owner = b.claim ? 'claimed' : (b.owner === 'agents' ? 'agents' : b.owner === 'agents-idle' ? 'idle' : 'team');
-    const label = b.claim ? (b.claim.owner || 'claimed') : (b.owner === 'agents' ? 'agents working'
-                    : b.owner === 'agents-idle' ? 'ours, idle' : 'team');
-    row.append(el('span', 'badge ' + owner, label));
-    row.append(el('span', 'meta', b.stopsAt ? `frees ${clock(b.stopsAt)} (${left(b.stopsAt)})` : 'no expiry'));
-    if (b.agents) row.append(el('span', 'meta', `${b.agents} agent panel${b.agents > 1 ? 's' : ''}`));
-    const stopping = stoppingHosts.includes(b.host);
-    if (stopping) row.append(el('span', 'badge stopping', 'stop requested'));
+    const top = el('div', 'box-top');
+    top.append(el('span', 'host', b.host));
+    const claimed = b.claim;
+    const state = claimed ? 'claimed' : b.owner === 'agents' ? 'agents' : b.owner === 'agents-idle' ? 'idle' : 'team';
+    const label = claimed ? (b.claim.owner || 'claimed')
+      : b.owner === 'agents' ? 'agents working' : b.owner === 'agents-idle' ? 'ours, idle' : 'team';
+    top.append(el('span', 'badge ' + state, label));
+    top.append(el('span', 'meta', b.stopsAt ? 'frees ' + clock(b.stopsAt) + ' · ' + left(b.stopsAt) : 'no expiry'));
+    if (b.agents) top.append(el('span', 'meta', b.agents + ' agent' + (b.agents > 1 ? 's' : '')));
+    if (stopping.includes(b.host)) top.append(el('span', 'badge stopping', 'stop requested'));
     const actions = el('div', 'actions');
-    if (b.claim) {
-      const clear = el('button', 'ghost', 'Clear claim');
+    if (claimed) {
+      const clear = el('button', 'ghost', 'Clear');
       clear.onclick = () => clearBox(b);
       actions.append(clear);
     }
-    const claim = el('button', null, b.claim ? 'Re-claim' : 'Claim');
-    claim.onclick = () => claimBox(b);
+    const claim = el('button', null, claimed ? 'Re-claim' : 'Claim');
+    claim.onclick = () => openClaim(b);
     actions.append(claim);
     const stop = el('button', 'danger', 'Stop');
-    if (b.claim) {
-      stop.onclick = () => stopBox(b);
-      stop.title = 'The workbench stops this VM on its next tick';
-    } else {
-      stop.disabled = true;
-      stop.title = 'Claim the box first, then stop it';
-    }
+    if (claimed) { stop.onclick = () => stopBox(b); stop.title = 'The workbench stops this VM on its next tick'; }
+    else { stop.disabled = true; stop.title = 'Claim the box first, then stop it'; }
     actions.append(stop);
-    row.append(actions);
-    card.append(row);
-    if (b.claim && (b.claim.note || b.claim.expires)) {
-      card.append(el('div', 'note', [b.claim.note, b.claim.expires ? `held ${left(new Date(b.claim.expires * 1000).toISOString())} more` : '']
-        .filter(Boolean).join(' · ')));
+    top.append(actions);
+    card.append(top);
+    if (claimed && (b.claim.note || b.claim.expires)) {
+      card.append(el('div', 'claim-note', [b.claim.note, b.claim.expires ? 'held ' + left(new Date(b.claim.expires * 1000).toISOString()) + ' more' : ''].filter(Boolean).join(' · ')));
     }
     const names = b.challenges || [];
-    card.append(el('div', 'chg', names.length ? names.join(', ') : 'no challenges mapped to this host'));
+    if (names.length) {
+      const chips = el('div', 'chips');
+      const shown = names.slice(0, 8);
+      for (const n of shown) chips.append(el('span', 'chip', n));
+      if (names.length > shown.length) chips.append(el('span', 'chip', '+' + (names.length - shown.length) + ' more'));
+      card.append(chips);
+    }
     wrap.append(card);
   }
+}
+
+function renderRivals(r) {
+  const host = $('rival');
+  host.textContent = '';
+  $('rivalSeen').textContent = r && r.at ? 'seen ' + clock(new Date(r.at * 1000).toISOString()) : '';
+  if (!r || !r.team) {
+    host.append(el('p', 'empty', 'The workbench has not published a rival yet. Set one in the desk (Rivals page).'));
+    return;
+  }
+  host.append(el('div', 'rival-team', r.team));
+  const gap = Number(r.gap_score || 0);
+  const lead = el('div', 'rival-lead');
+  lead.append(document.createTextNode(gap === 0 ? 'Level on points · ' : (gap < 0 ? 'They lead by ' : 'We lead by ')));
+  lead.append(el('b', null, Math.abs(gap).toLocaleString() + ' pts'));
+  lead.append(document.createTextNode(r.their_place || r.our_place ? ' · #' + (r.their_place || '?') + ' vs #' + (r.our_place || '?') : ''));
+  host.append(lead);
+
+  const max = Math.max(Number(r.their_score || 0), Number(r.our_score || 0), 1);
+  const bars = el('div', 'bars');
+  for (const [label, value, cls] of [['them', r.their_score, 'them'], ['us', r.our_score, '']]) {
+    const row = el('div', 'bar-row');
+    row.append(el('span', 'bar-label', label));
+    const track = el('div', 'bar-track');
+    const fill = el('div', 'bar-fill' + (cls ? ' ' + cls : ''));
+    fill.style.width = Math.max(2, Math.round(Number(value || 0) / max * 100)) + '%';
+    track.append(fill);
+    row.append(track, el('span', 'bar-val', Number(value || 0).toLocaleString()));
+    bars.append(row);
+  }
+  host.append(bars);
+
+  const split = el('div', 'split');
+  for (const [k, v, title] of [
+    ['shared', r.shared, 'solved by both'],
+    ['ours only', r.ours_only, 'we have, they do not'],
+    ['theirs only', r.theirs_only, 'they have, we do not']]) {
+    const stat = el('div', 'stat', null);
+    stat.append(el('div', 'k', k));
+    stat.append(el('div', 'v', v == null ? '–' : String(v)));
+    stat.title = title;
+    split.append(stat);
+  }
+  host.append(split);
+
+  const top = Array.isArray(r.top) ? r.top : [];
+  if (top.length) {
+    const list = el('div', 'top-list');
+    for (const t of top) {
+      const row = el('div', 'top-row' + (t.us ? ' us' : t.rival ? ' rival' : ''));
+      row.append(el('span', 'pos', t.place == null ? '–' : String(t.place)));
+      row.append(el('span', 'name', t.name));
+      row.append(el('span', 'score', Number(t.score || 0).toLocaleString()));
+      list.append(row);
+    }
+    host.append(list);
+  }
+
+  const scanned = Number(r.scanned || 0), total = Number(r.total || 0);
+  if (total) {
+    const scan = el('div', 'scan');
+    scan.append(el('span', null, 'scan ' + scanned + '/' + total));
+    const track = el('div', 'track');
+    const fill = el('div', 'fill');
+    fill.style.width = Math.round(scanned / total * 100) + '%';
+    track.append(fill);
+    scan.append(track);
+    host.append(scan);
+  }
+  host.append(el('div', 'meta', 'Published by the workbench · challenge names stay private.'));
+}
+
+function renderWaiting(data) {
   const waiting = data.waiting || [];
-  $('waitCount').textContent = waiting.length ? `(${waiting.length})` : '';
+  $('waitCount').textContent = waiting.length ? String(waiting.length) : '';
   const list = $('waiting');
   list.textContent = '';
-  for (const w of waiting) list.append(el('li', null, typeof w === 'string' ? w : (w.challenge || '')));
-  if (!waiting.length) list.append(el('li', 'empty', 'nothing queued'));
+  if (!waiting.length) { list.append(el('p', 'empty', 'Nothing queued.')); return; }
+  for (const w of waiting) {
+    const row = el('div', 'wait-item');
+    row.append(el('span', null, typeof w === 'string' ? w : (w.challenge || '')));
+    if (w && typeof w === 'object' && w.solves != null) row.append(el('span', 'pts', w.solves + ' solves'));
+    list.append(row);
+  }
+}
+
+function render(data) {
+  current = data;
+  const slots = data.slots || {};
+  const cap = slots.cap, count = slots.count;
+  $('slots').textContent = (count ?? 0) + '/' + (cap ?? '?') + ' boxes';
+  $('slots').className = 'pill' + (cap && count >= cap ? ' full' : '');
+  $('updated').textContent = data.updated ? 'seen ' + new Date(data.updated * 1000).toLocaleTimeString() : 'no data yet';
+  renderBoxes(data);
+  renderRivals(data.rivals);
+  renderWaiting(data);
 }
 
 async function load(force) {
-  if (busy) return;
+  if (busy && !force) return;
   busy = true;
   try {
     const r = await fetch('/api/floor', { cache: 'no-store' });
@@ -204,8 +378,9 @@ async function load(force) {
   }
 }
 
-load();
-setInterval(load, 10000);
+load(true);
+setInterval(() => load(false), 10000);
+setInterval(() => { if (current) { renderBoxes(current); renderRivals(current.rivals); } }, 1000);
 </script>
 </body>
 </html>

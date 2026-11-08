@@ -54,6 +54,46 @@ def stop_requests() -> list:
     return rows
 
 
+def clean_rivals(raw) -> dict | None:
+    """Public rival summary written by the workbench: numbers and short labels only."""
+    if not isinstance(raw, dict):
+        return None
+    out = {}
+    for key in ('team',):
+        value = clean(raw.get(key), 60)
+        if value:
+            out[key] = value
+    for key in ('their_score', 'their_place', 'their_solved', 'our_score', 'our_place', 'our_solved',
+                'gap_score', 'gap_solves', 'theirs_only', 'ours_only', 'shared', 'scanned', 'total'):
+        value = raw.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            out[key] = value
+    top = raw.get('top')
+    if isinstance(top, list):
+        rows = []
+        for row in top[:5]:
+            if not isinstance(row, dict):
+                continue
+            name = clean(row.get('name'), 60)
+            if not name:
+                continue
+            item = {'name': name}
+            for key in ('score', 'place'):
+                value = row.get(key)
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    item[key] = value
+            for key in ('us', 'rival'):
+                if isinstance(row.get(key), bool):
+                    item[key] = row[key]
+            rows.append(item)
+        if rows:
+            out['top'] = rows
+    seen = raw.get('at')
+    if isinstance(seen, (int, float)) and not isinstance(seen, bool):
+        out['at'] = seen
+    return out or None
+
+
 def state() -> dict:
     raw = load(STATE, {}) or {}
     cl = claims()
@@ -65,7 +105,8 @@ def state() -> dict:
     waiting = raw.get('waiting', [])
     stopping = [r.get('host') for r in stop_requests()]
     return {'boxes': boxes, 'waiting': waiting, 'slots': raw.get('slots') or {},
-            'updated': raw.get('updated'), 'claims': list(cl.values()), 'stopping': stopping}
+            'updated': raw.get('updated'), 'claims': list(cl.values()), 'stopping': stopping,
+            'rivals': clean_rivals(raw.get('rivals'))}
 
 
 def limited(ip: str) -> bool:
@@ -152,7 +193,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({'error': 'bad boxes'}, HTTPStatus.BAD_REQUEST)
                 return
             save(STATE, {'boxes': boxes, 'waiting': body.get('waiting') or [],
-                         'slots': body.get('slots') or {}, 'updated': time.time()})
+                         'slots': body.get('slots') or {}, 'rivals': clean_rivals(body.get('rivals')),
+                         'updated': time.time()})
             self._json({'ok': True, 'boxes': len(boxes)})
             return
         if path == '/api/requests/ack':
